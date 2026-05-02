@@ -97,6 +97,15 @@ body.ltr .cdown-num{font-family:'Cinzel',serif;font-size:20px}
 @keyframes fd{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes glow{0%,100%{opacity:.6}50%{opacity:1}}
 
+/* ── SHINE ONCE (replaces fade-in) ── */
+@keyframes shine-once{
+  0%   { box-shadow: 0 0 0px rgba(201,168,76,0); }
+  35%  { box-shadow: 0 0 22px rgba(201,168,76,0.22), inset 0 0 12px rgba(201,168,76,0.07); }
+  100% { box-shadow: 0 0 0px rgba(201,168,76,0); }
+}
+.fi-el { opacity:1; transform:none; transition:none; }
+.fi-el.vis { animation: shine-once 1s ease forwards; }
+
 /* ── HERO ── */
 .hero{min-height:100svh;background:radial-gradient(ellipse 90% 70% at 50% 10%,#251A00,#100C00 55%,var(--black));position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 20px 60px;overflow:hidden}
 .hero::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23C9A84C' fill-opacity='0.025'%3E%3Cpath d='M50 50v-6h-3v6h-6v3h6v6h3v-6h6v-3h-6zm0-44V0h-3v6h-6v3h6v6h3V9h6V6h-6zM6 50v-6H3v6H0v3h3v6h3v-6h6v-3H6zM6 6V0H3v6H0v3h3v6h3V9h6V6H6z'/%3E%3C/g%3E%3C/svg%3E");pointer-events:none}
@@ -294,10 +303,6 @@ footer p{font-size:13px;color:var(--muted);line-height:1.8}
 .sticky-btn:hover{transform:translateY(-3px);box-shadow:0 12px 56px rgba(201,168,76,.85)}
 body.ltr .sticky-btn{font-family:'EB Garamond',serif;letter-spacing:2px}
 
-/* ── FADE IN ── */
-.fi-el{opacity:0;transform:translateY(24px);transition:opacity .75s ease,transform .75s ease}
-.fi-el.vis{opacity:1;transform:translateY(0)}
-
 @media(max-width:640px){.hero-stats .sdiv{display:none}.hero-stats{gap:22px}}
 @media(max-width:380px){.hero-stats{flex-direction:column;align-items:center;gap:14px}}
 </style>
@@ -489,8 +494,6 @@ body.ltr .sticky-btn{font-family:'EB Garamond',serif;letter-spacing:2px}
     </div>
   </div>
 </div>
-
-
 
 <!-- ══ SCHEDULE ══ -->
 <section class="sec">
@@ -799,9 +802,6 @@ function setLang(lang){
 
 // ══════════════════════════════════════
 //  COUNTDOWN — persists across refreshes
-//  Deadline = first visit time + random offset
-//  between 2d 14h and 2d 22h so it never
-//  looks like an exact 3-day reset
 // ══════════════════════════════════════
 (function(){
   var KEY='aliyat_deadline';
@@ -809,7 +809,6 @@ function setLang(lang){
   var deadline;
   if(stored){
     deadline=parseInt(stored,10);
-    // if already expired, reset with new random window
     if(Date.now()>=deadline){
       deadline=newDeadline();
       localStorage.setItem(KEY,deadline);
@@ -820,7 +819,6 @@ function setLang(lang){
   }
 
   function newDeadline(){
-    // 2 days + random 14h–22h so it starts at e.g. 2d 17h 43m
     var base=2*24*3600*1000;
     var extra=(14+Math.random()*8)*3600*1000;
     return Date.now()+base+extra;
@@ -861,21 +859,20 @@ async function submitForm(e){
   data.set('age_group',ageVal);data.set('quran_level',lvlVal);
   data.delete('age_group_en');data.delete('quran_level_en');
   try{
-  await fetch('https://api.web3forms.com/submit',{
-    method:'POST',
-    body:data
-  });
+    await fetch('https://api.web3forms.com/submit',{
+      method:'POST',
+      body:data
+    });
+    if(typeof fbq!=='undefined'){
+      fbq('trackCustom','FormSubmit',{value:400});
+    }
+  }catch(e){}
 
-  fbq('trackCustom', 'FormSubmit', {
-  value: 400
-});
-  }
-
-}catch(e){}
   var sheetUrl='https://script.google.com/macros/s/AKfycbxdJKBE4S0LhFPxqXjOVx__X3InJ3C4hur7dH4jH8xK0TJWnR6UJo0OBoPJ_CeBoft63Q/exec';
   var obj={};data.forEach(function(v,k){obj[k]=v;});
   obj.timestamp=new Date().toLocaleString();obj.language=currentLang;
   try{await fetch(sheetUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(obj)});}catch(e){}
+
   form.style.display='none';
   document.getElementById('successMsg').style.display='block';
   document.getElementById('successMsg').scrollIntoView({behavior:'smooth',block:'center'});
@@ -899,10 +896,17 @@ var sc=document.getElementById('stickyCta');
 window.addEventListener('scroll',function(){sc.classList.toggle('vis',window.scrollY>500);});
 
 // ══════════════════════════════════════
-//  FADE IN
+//  SHINE ON SCROLL (replaces fade-in)
 // ══════════════════════════════════════
 var obs=new IntersectionObserver(function(entries){
-  entries.forEach(function(e){if(e.isIntersecting){e.target.classList.add('vis');obs.unobserve(e.target);}});
+  entries.forEach(function(e){
+    if(e.isIntersecting){
+      e.target.classList.remove('vis');
+      void e.target.offsetWidth; // force reflow لإعادة الأنيميشن
+      e.target.classList.add('vis');
+      obs.unobserve(e.target);
+    }
+  });
 },{threshold:0.07});
 document.querySelectorAll('.fi-el').forEach(function(el){obs.observe(el);});
 </script>
