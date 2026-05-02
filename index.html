@@ -866,11 +866,9 @@ async function submitForm(e){
     body:data
   });
 
-  if (typeof fbq !== 'undefined') {
-    fbq('track', 'Purchase', {
-      value: 400,
-      currency: 'USD'
-    });
+  fbq('trackCustom', 'FormSubmit', {
+  value: 400
+});
   }
 
 }catch(e){}
